@@ -1,0 +1,179 @@
+# UNDERPERFORMING SEGEMENTS - identifies customers with fairly high income but low spending score to understand why these segments are not spending much and possibly create targeted campaigns 
+# SELECT
+#   age,
+#   gender,
+#   income,
+#   spending_score,
+#   preferred_category
+# FROM
+#   `customer-segmentation-431822.market_analysis.segmentation_data`
+# WHERE
+#   income > 75000
+#   AND spending_score < 30
+# ORDER BY
+#   spending_score ASC;
+
+
+# HIGH LOYALTY SPENDING - identifies loyal customers that have higher than average spending based on their last purchase. Potential to create loyalty programs to better retain these customers
+# SELECT
+#   age,
+#   gender,
+#   preferred_category,
+#   membership_years,
+#   ROUND(AVG(last_purchase_amount),2) AS avg_spending
+# FROM
+#   `customer-segmentation-431822.market_analysis.segmentation_data`
+# WHERE
+#   membership_years >= 5
+# GROUP BY
+#   age, gender, preferred_category, membership_years
+# HAVING
+#   AVG(last_purchase_amount) > (SELECT AVG(last_purchase_amount) FROM `customer-segmentation-431822.market_analysis.segmentation_data`)
+# ORDER BY
+#   avg_spending DESC;
+
+
+# HIGH VALUE SPENDING - identifies customers with high income and high spending score to see which categories they are most attracted to and possibly create campaigns to maximize revenue from this segment
+# SELECT
+#   preferred_category,
+#   COUNT(id) AS customer_count,
+#   ROUND(AVG(last_purchase_amount),2) AS avg_spending
+# FROM
+#   `customer-segmentation-431822.market_analysis.segmentation_data`
+# WHERE
+#   income > 90000
+#   AND spending_score > 70
+# GROUP BY
+#   preferred_category
+# ORDER BY
+#   avg_spending DESC;
+
+
+# AGE GROUP PREFERRED CATEGORY - identifies the most preferred category within each age group based on purchase frequency to help tailor messaging and product offerings 
+# WITH age_groups AS (
+#   SELECT id,
+#     CASE
+#         WHEN age >= 18 AND age <= 27 THEN '18-27'
+#         WHEN age >= 28 AND age <= 37 THEN '26-37'
+#         WHEN age >= 38 AND age <= 47 THEN '38-47'
+#         WHEN age >= 48 AND age <= 57 THEN '48-57'
+#       ELSE '58+'
+#     END AS age_group,
+#     preferred_category,
+#     purchase_frequency
+#   FROM `customer-segmentation-431822.market_analysis.segmentation_data`
+# ),
+#
+# category_totals AS (
+#   SELECT
+#     age_group,
+#     preferred_category,
+#     SUM(purchase_frequency) AS total_purchases
+#   FROM age_groups
+#   GROUP BY age_group, preferred_category
+# )
+#
+# SELECT
+#   age_group,
+#   preferred_category,
+#   total_purchases
+# FROM (
+#   SELECT
+#     age_group,
+#     preferred_category,
+#     total_purchases,
+#     ROW_NUMBER() OVER (PARTITION BY age_group ORDER BY total_purchases DESC) AS rank
+#   FROM category_totals
+# ) AS ranked_categories
+# WHERE rank = 1
+# ORDER BY age_group;
+
+
+# IMPACT OF INCOME ON SPENDING - analyzes the average spending across the different incomes groups based on their last purchase to understand how spending behavior changes with income. Can inform pricing 
+# strategies and targeted promotions
+# WITH income_groups AS (
+#   SELECT
+#     id,
+#     last_purchase_amount,
+#     CASE
+#         WHEN income >= 30000 AND income <= 44999 THEN '30000 - 44999'
+#         WHEN income >= 45000 AND income <= 59999 THEN '45000 - 59999'
+#         WHEN income >= 60000 AND income <= 74999 THEN '60000 - 74999'
+#         WHEN income >= 75000 AND income <= 89999 THEN '75000 - 89999'
+#         WHEN income >= 90000 AND income <= 104999 THEN '90000 - 104999'
+#         WHEN income >= 105000 AND income <= 124999 THEN '105000 - 124999'
+#       ELSE '125000+'
+#     END AS income_group
+#   FROM
+#     `customer-segmentation-431822.market_analysis.segmentation_data`
+# )
+#
+# SELECT
+#   income_group,
+#   ROUND(AVG(last_purchase_amount),2) AS avg_spending,
+#   COUNT(id) AS customer_count
+# FROM
+#   income_groups
+# GROUP BY
+#   income_group
+# ORDER BY
+#   CASE
+#     WHEN income_group = '30000 - 44999' THEN 1
+#     WHEN income_group = '45000 - 59999' THEN 2
+#     WHEN income_group = '60000 - 74999' THEN 3
+#     WHEN income_group = '75000 - 89999' THEN 4
+#     WHEN income_group = '90000 - 104999' THEN 5
+#     WHEN income_group = '105000 - 124999' THEN 6
+#     ELSE 7
+#   END;
+#
+# CUSTOMER RANKING BY PURCHASE FREQUENCY - ranks customer in each category based on their purchase frequency to identify the most engaged customers. Can be used to reward the top customers and possibly 
+# encourage them to become brand advocates
+# WITH category_ranks AS (
+#   SELECT
+#     id,
+#     preferred_category,
+#     purchase_frequency,
+#     DENSE_RANK() OVER (PARTITION BY preferred_category ORDER BY purchase_frequency DESC) AS rank
+#   FROM
+#     `customer-segmentation-431822.market_analysis.segmentation_data`
+# )
+# SELECT
+#   preferred_category,
+#   id,
+#   purchase_frequency,
+#   rank
+# FROM
+#   category_ranks
+# ORDER BY
+#   preferred_category, rank;
+#
+# TREND OF PURCHASE FREQUENCY BY MEMBERSHIP YEARS - examines the trend in purchase frequency as membership years increase. Can help advise customer retention by seeing where purchase frequency either 
+# increases or decreases
+# WITH membership_trends AS (
+#   SELECT
+#     id,
+#     membership_years,
+#     purchase_frequency,
+#     ROUND(AVG(purchase_frequency) OVER (PARTITION BY membership_years ORDER BY membership_years),2) AS avg_purchase_frequency
+#   FROM
+#     `customer-segmentation-431822.market_analysis.segmentation_data`
+# ),
+# lagged_trends AS (
+#   SELECT
+#     membership_years,
+#     avg_purchase_frequency,
+#     LAG(avg_purchase_frequency) OVER (ORDER BY membership_years) AS prev_avg_purchase_frequency
+#   FROM
+#     membership_trends
+#   GROUP BY
+#     membership_years, avg_purchase_frequency
+# )
+# SELECT
+#   membership_years,
+#   avg_purchase_frequency,
+#   ROUND(avg_purchase_frequency - prev_avg_purchase_frequency,2) AS frequency_change
+# FROM
+#   lagged_trends
+# ORDER BY
+#   membership_years;
