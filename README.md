@@ -1,4 +1,4 @@
-# customer_segmentation
+# Customer Segmentation
 This repository holds my customer segmentation project
 
 # Purpose
