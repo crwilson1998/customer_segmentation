@@ -1,3 +1,12 @@
+/*
+
+Customer Segementation Data Exploration 
+
+Skills used: Joins, CTE's, Windows Functions, Aggregate Functions
+
+*/
+
+
 # UNDERPERFORMING SEGEMENTS - identifies customers with fairly high income but low spending score to understand why these segments are not spending much and possibly create targeted campaigns 
 # SELECT
 #   age,
